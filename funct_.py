@@ -33,13 +33,14 @@ def ssh_connect(host_ip,host_port,host_name,host_password,cmd):
     result_info = ""
     for line in stderr.readlines():
         result_info += line
+	client.close()
     return result_info
 
 def ssh_cmd(cmd):
     ssh_result=ssh_connect(HOST_IP,HOST_PORT,HOST_USERNAME,HOST_PASSWORD,cmd)
 #   print("ssh connect success!")
     return ssh_result
-# 待补充关闭SSH ？是否会关闭长时间等待的SSH，试一试后补上
+
 
 # 端口检测功能函数
 def host_sock():
