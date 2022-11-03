@@ -1,28 +1,61 @@
-import time
+# Data:20220530
+# Descript:最新版适用所有用到ssh/uart的自动化任务
+# Version:1.5
 import paramiko  # SSH使用必要的模块
 import socket    # 端口检测必要的模块
 import serial    # UART使用必要模块
-import os        # 调用系统模块
-import config_
+import os        # 调用windows系统模块
+import time
+from config_ import *
+# import msvcrt
+import logging
 
-# ssh配置
-HOST_IP = config_.HOST_IP
-HOST_PORT = config_.HOST_PORT
-HOST_USERNAME = config_.HOST_USERNAME
-HOST_PASSWORD = config_.HOST_PASSWORD
-# 端口检测配置
-HOST_SOCK_IP = config_.HOST_IP
-HOST_SOCK_PORT = config_.HOST_PORT
-# bmc配置
-BMC_IP = config_.BMC_IP
-BMC_USERNAME = config_.BMC_USERNAME
-BMC_PASSWORD = config_.BMC_PASSWORD
-# ipmitool配置
-IPMITOOL_PATH = config_.IPMITOOL_PATH
-# uart配置
-UART_PORT=config_.UART_PORT
-UART_BAUDRATE=config_.UART_BAUDRATE
-UART_TIMEOUT=config_.UART_TIMEOUT
+# def log_init(name_):
+#     log_filename = LOG_DIR + name_ + ".log"
+#     logger = logging.getLogger()
+#     logging.basicConfig(filename=log_filename, format=LOG_FORMAT, level=LOG_LEVEL)
+#     return logger
+
+def log_1(name_):
+    # 定义文件
+    file1 = logging.FileHandler(filename=str(name_)+'.log', mode='a', encoding='utf-8')
+    fmt = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s -%(module)s:  %(message)s", datefmt='%Y-%m-%d %H:%M:%S')
+    file1.setFormatter(fmt)
+
+    # 定义日志
+    logger1 = logging.Logger(name='log_1', level=logging.INFO)
+    logger1.addHandler(file1)
+    return logger1
+
+def log_2(name_):
+    # 定义文件
+    file2 = logging.FileHandler(filename=str(name_)+'.log', mode='a', encoding='utf-8')
+    fmt = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s -%(module)s:  %(message)s", datefmt='%Y-%m-%d %H:%M:%S')
+    file2.setFormatter(fmt)
+
+    # 定义日志
+    logger2 = logging.Logger(name='log_2', level=logging.INFO)
+    logger2.addHandler(file2)
+    return logger2
+
+# uart串口交互功能函数
+def serial_open(port, bps, timeouts):
+    serial_obj =serial.Serial(port, bps, timeout=timeouts)  # 打开串口，并得到串口对象
+    return serial_obj
+def serial_cmd(cmd):
+    serial_obj = serial_open(UART_PORT, UART_BAUDRATE, UART_TIMEOUT)
+    # print(serial_obj.is_open)
+    for line in cmd:
+        serial_obj.write(line.encode("utf-8"))  # 写数据
+        time.sleep(1)
+    r_data = serial_obj.readlines()
+    rdata = []
+    for i in r_data:
+        i = i.decode("utf-8", "ignore")
+        rdata.append(i[:-2])
+    if serial_obj.is_open:
+        serial_obj.close()
+    return rdata
 
 # ssh交互功能函数
 def ssh_connect(host_ip,host_port,host_name,host_password,cmd):
@@ -33,7 +66,7 @@ def ssh_connect(host_ip,host_port,host_name,host_password,cmd):
     result_info = ""
     for line in stderr.readlines():
         result_info += line
-	client.close()
+    client.close()
     return result_info
 
 def ssh_cmd(cmd):
@@ -41,46 +74,32 @@ def ssh_cmd(cmd):
 #   print("ssh connect success!")
     return ssh_result
 
-
 # 端口检测功能函数
 def host_sock():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    result = sock.connect_ex((HOST_SOCK_IP, HOST_SOCK_PORT))  # 判断22端口是否开启（方便判断是否进入OS以及是否ssh连接）
+    result = sock.connect_ex((HOST_IP, HOST_PORT))  # 判断22端口是否开启（方便判断是否进入OS以及是否ssh连接）
     if 0 == result:
-        print("Port 22 is open!")
+        # print("Port 22 is open!")
+        pass
     else:
-        print("Port 22 is not open，return code：%s" % result)
+        # print("Port 22 is not open，return code：%s" % result)
+        pass
     return result  # 状态码0表端口开启，否则未开启
 
 # bmc上下电服务器功能函数（有待考量是否上下电和直接reboot的区别？？？）
 def power_on():
-    os.system(IPMITOOL_PATH+" -I lan" + " -U " + BMC_USERNAME + " -P " + BMC_PASSWORD + " -H " + BMC_IP + " power on")
+    os.system(IPMITOOL_PATH+" -I lanplus" + " -U " + BMC_USERNAME + " -P " + BMC_PASSWORD + " -H " + BMC_IP + " power on")
 def power_off():
-    os.system(IPMITOOL_PATH+" -I lan" + " -U " + BMC_USERNAME + " -P " + BMC_PASSWORD + " -H " + BMC_IP + " power off")
+    os.system(IPMITOOL_PATH+" -I lanplus" + " -U " + BMC_USERNAME + " -P " + BMC_PASSWORD + " -H " + BMC_IP + " power off")
 # bmc重启服务器检测功能函数
-def reboot():
+def power_monitor():
     while True:
         time.sleep(10)
-        flag_value = host_ssh_.host_sock()
+        flag_value = host_sock()
         if flag_value == 0:
             print("reboot success! port 22 is open! ")
             break
         else:
-            print("The device is restarting...")
+            print("服务器正在启动中......")
 
-# uart串口交互功能函数
-def serial_open(port, bps, timeouts):
-    serial_obj =serial.Serial(port, bps, timeout=timeouts, rtscts=True, dsrdtr=True)  # 打开串口，并得到串口对象
-    return serial_obj
 
-def serial_cmd(cmd):
-    serial_obj = serial_open(UART_PORT, UART_BAUDRATE, UART_TIMEOUT)
-    # print(serial_obj.is_open)
-    serial_obj.write(cmd.encode("utf-8"))  # 写数据
-    time.sleep(0.4)
-    r_data = serial_obj.readlines()
-    rdata = []
-    for i in r_data:
-        i = i.decode("utf-8", "ignore")
-        rdata.append(i[:-1])
-    return rdata
